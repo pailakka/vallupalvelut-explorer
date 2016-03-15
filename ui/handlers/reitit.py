@@ -96,7 +96,8 @@ class KauttaHandler(BaseHandler):
             sqlq = ('SELECT DISTINCT reittinro_pysyva as reittiid,lupasoptunnus,liikharjnro,liikharj_nimi,reittinimi,reitti_voimaan_pvm,reitti_paattyy_pvm,reittia_muokattu_pvm,(SELECT COUNT(*) FROM vuorot v WHERE v.reittinro_pysyva = vs.reittinro_pysyva) as vuoromaara,vuorotyyppi,(SELECT MIN(vuoron_url_interpoloitu) FROM vuorot v2 WHERE v2.reittinro_pysyva=vs.reittinro_pysyva) as vuoron_url_interpoloitu FROM vuorot vs WHERE vs.vuoro_lisatunniste IN (SELECT pk.vuoro_lisa FROM pysakkiketjut pk WHERE pk.pysakki_gid IN %s) ORDER BY vs.lupasoptunnus,vs.reittinro_pysyva')
         else:
             sqlq = ('SELECT vs.* FROM vuorot vs WHERE vs.vuoro_lisatunniste IN (SELECT pk.vuoro_lisa FROM pysakkiketjut pk WHERE pk.pysakki_gid IN %s)')
-
+        if len(stations) == 0:
+            stations = [None,]
         curs.execute(sqlq,(tuple(stations),))
 
         reitit = curs.fetchall()
