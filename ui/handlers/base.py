@@ -29,9 +29,14 @@ class TemplateRendering:
 class BaseHandler(tornado.web.RequestHandler, TemplateRendering):
     @property
     def cursor(self,*args):
+        self.dbconn = self.application.dbconn.getconn()
+        self.curs = self.dbconn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        return self.curs
 
-        cursor = self.application.dbconn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        return cursor
+    def on_finish(self):
+        if not self.curs.closed:
+            self.curs.close()
+        self.application.dbconn.putconn(self.dbconn)        
 
     def render2(self, template_name, **kwargs):
         kwargs.update({

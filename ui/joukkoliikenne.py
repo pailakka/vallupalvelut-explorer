@@ -11,7 +11,7 @@ import psycopg2
 import psycopg2.extensions
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
-
+from psycopg2.pool import ThreadedConnectionPool
 import codecs
 
 import handlers.index
@@ -71,7 +71,7 @@ class Application(tornado.web.Application):
         assert options.dbname
         assert options.dbuser
         assert options.dbpasswd
-        self.dbconn = psycopg2.connect(host=options.dbhost,port=options.dbport,dbname=options.dbname,user=options.dbuser,password=options.dbpasswd)
+        self.dbconn = ThreadedConnectionPool(1,5,host=options.dbhost,port=options.dbport,dbname=options.dbname,user=options.dbuser,password=options.dbpasswd)
 
         self.kuntanumerot = {}
         f = codecs.open('/home/peltonent/jltikku/db/kuntanumerot.txt','r','utf-8')
