@@ -51,7 +51,7 @@ if len(sys.argv) == 1:
     os.mkdir(temp_path)
 
     urls = (
-    ('https://koontikartta.navici.com/tiedostot/vuoro.csv','vuoro.csv'),
+    ('https://koontikartta.navici.com/tiedostot/vuoroV2.zip','vuoroV2.zip'),
     ('https://koontikartta.navici.com/tiedostot/pysakkiketjut.zip','pysakkiketjut.zip'),
     ('https://koontikartta.navici.com/tiedostot/linjaukset.zip','linjaukset.zip'),
     )
@@ -96,10 +96,10 @@ curs = conn.cursor()
 #curs.execute('TRUNCATE TABLE vuorot;');
 #curs.execute('TRUNCATE TABLE pysakkiketjut;');
 #curs.execute('TRUNCATE TABLE pysakit;');
-curs.execute('DELETE FROM vuorot;');
-curs.execute('DELETE FROM pysakkiketjut;');
-curs.execute('DELETE FROM pysakit;');
-curs.execute('DELETE FROM linjaukset;');
+curs.execute('DELETE FROM vuorot;')
+curs.execute('DELETE FROM pysakkiketjut;')
+curs.execute('DELETE FROM pysakit;')
+curs.execute('DELETE FROM linjaukset;')
 curs.close()
 conn.commit()
 
@@ -113,35 +113,39 @@ if True:
                 VALUES
                 (%(lu_viranro_myontaa)s,%(viranomaisnimi)s,%(lu_viranro_valvoo)s,%(viranomaisnimi_1)s,%(lu_voim_pvm)s,%(lu_lop_pvm)s,%(lu_tod_loppvm)s,%(lupasoptunnus)s,%(muokattu_pvm)s,%(liikharjnro)s,%(liikharj_nimi)s,%(reittinro_pysyva)s,%(reittinimi)s,%(ajosuunta)s,%(linjan_tunnus)s,%(reitti_voimaan_pvm)s,%(reitti_paattyy_pvm)s,%(reittia_muokattu_pvm)s,%(vuorotunniste_pysyva)s,%(vuoromerk)s,%(lahtoaika)s,%(perilla)s,%(kausi)s,%(vuorotyyppi)s,%(vuoro_lisatunniste)s,%(vuoro_voimaan_pvm)s,%(vuoro_paattyy_pvm)s,%(vuoroa_muokattu_pvm)s,%(kasitelty_koontikartassa)s,%(siirtyy_matka_fi)s,%(vuoron_url_interpoloitu)s)'''
     execlist = []
-    with open(os.path.join(temp_path,'vuoro.csv'),'rb') as f:
-        csvf = unicodecsv.reader(f, delimiter=';', quotechar='"',encoding='utf-8-sig')
-        header = False
-        for l in csvf:
-            if not header:
-                l[0] = l[0].replace('"','')
-                header = l
-                continue
-            l = dict(zip(header,l))
+    zf = zipfile.ZipFile(os.path.join(temp_path,'vuoroV2.zip'))
+    f = zf.open('vuoroV2.csv','r')
+    csvf = unicodecsv.reader(f,delimiter=';', quotechar='"',encoding='utf-8-sig')    
+    header = False
+    for l in csvf:
+        if not header:
+            l[0] = l[0].replace('"','')
+            header = l
+            continue
+        l = dict(zip(header,l))
 
-            for k in (u'siirtyy_matka_fi',u'kasitelty_koontikartassa'):
-                l[k] = l[k] == u'kyll\xe4'
+        for k in (u'siirtyy_matka_fi',u'kasitelty_koontikartassa'):
+            l[k] = l[k] == u'kyll\xe4'
 
-            for k in header:
-                if k.endswith('pvm'):
-                    if l[k] == '':
-                        l[k] = None
-                    else:
-                        l[k] = parse(l[k])
+        for k in header:
+            if k.endswith('pvm'):
+                if l[k] == '':
+                    l[k] = None
+                else:
+                    l[k] = datetime.datetime.strptime(l[k],'%d.%m.%Y %H:%M:%S')
 
-            for k in (u'liikharjnro',u'reittinro_pysyva',u'vuoro_lisatunniste',u'vuorotunniste_pysyva'):
-                l[k] = int(l[k])
-            #pprint.pprint(l)
-            execlist.append(l)
-            if i % 1000 == 0:
-                curs.executemany(vuorot_sqlq,execlist)
-                execlist = []
-                print i
-            i+=1
+        for k in (u'liikharjnro',u'reittinro_pysyva',u'vuoro_lisatunniste',u'vuorotunniste_pysyva'):
+            l[k] = int(l[k])
+        
+        l['vuoron_url_interpoloitu'] = l['vuoron_url_interpoloitu'].replace('http://traffic.navici.com/trips/interpolated/trip','https://koontikartta.navici.com/vuoro/')
+        
+        #pprint.pprint(l)
+        execlist.append(l)
+        if i % 1000 == 0:
+            curs.executemany(vuorot_sqlq,execlist)
+            execlist = []
+            print i
+        i+=1
     curs.executemany(vuorot_sqlq,execlist)
     curs.close()
     conn.commit()
@@ -194,7 +198,7 @@ if True:
     print 'Linjaukset'
     curs = conn.cursor()
     execlist = []
-
+    known_vuorot = set()
     linjaukset_sql = 'INSERT INTO linjaukset (vuoro_lisa,tyyppi,geom) VALUES (%(VUORO_LISA)s,%(TYYPPI)s,ST_SetSRID(ST_GeomFromWKB(decode(%(geomwkb)s,\'hex\')),3067))'
     with zipfile.ZipFile(os.path.join(temp_path,'linjaukset.zip')) as zf:
 
@@ -206,6 +210,10 @@ if True:
         i = 0
         for sr in sf.iterShapeRecords():
             r = dict(zip(headers,sr.record))
+
+            if r['VUORO_LISA'] in known_vuorot:
+              continue
+            known_vuorot.add(r['VUORO_LISA'])
             #x,y = map(lambda v: round(v,1),sr.shape.points[0])
 
 
